@@ -3,7 +3,7 @@ use lg_webos_client::client::*;
 use std::sync::RwLock;
 use lazy_static::lazy_static;
 use structopt::StructOpt;
-use std::str::FromStr;
+use std::str::{FromStr, ParseBoolError};
 use std::num::ParseIntError;
 
 lazy_static! {
@@ -33,19 +33,35 @@ enum GetArgs {
 
 #[derive(StructOpt, Debug)]
 enum SetArgs {
-    Vol(VolOpts)
+    Vol(IntOpts),
+    Power(BoolOpts),
 }
 
 #[derive(StructOpt, Debug)]
-struct VolOpts {
+struct IntOpts {
     vol: i8,
 }
 
-impl FromStr for VolOpts {
+#[derive(StructOpt, Debug)]
+struct BoolOpts {
+    state: bool,
+}
+
+impl FromStr for BoolOpts {
+    type Err = ParseBoolError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match bool::from_str(s) {
+            Ok(res) => Ok(BoolOpts { state: res }),
+            Err(e) => Err(e)
+        }
+    }
+}
+
+impl FromStr for IntOpts {
     type Err = ParseIntError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match i8::from_str(s) {
-            Ok(res) => Ok(VolOpts { vol: res }),
+            Ok(res) => Ok(IntOpts { vol: res }),
             Err(e) => Err(e)
         }
     }
@@ -75,6 +91,13 @@ async fn main() {
                 match setargs {
                     SetArgs::Vol(vol) => {
                         res = send_command(client, Command::SetVolume(vol.vol)).await;
+                    }
+                    SetArgs::Power(state) => {
+                        if !state {
+                            res = send_command(client, Command::TurnOff).await;
+                        } else {
+                            todo!("Not implemented")
+                        }
                     }
                 }
             }
