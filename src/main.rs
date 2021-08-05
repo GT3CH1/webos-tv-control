@@ -60,7 +60,7 @@ async fn main() {
             Cli::Get(getargs) => {
                 match getargs {
                     GetArgs::Vol => {
-                        res = send_command(client, Command::Ge).await;
+                        res = send_command(client, Command::GetVolume).await;
                     }
                     GetArgs::InputList => {
                         res = send_command(client, Command::GetExternalInputList).await;
@@ -99,8 +99,8 @@ async fn send_command(mut client: WebosClient, command: Command) -> String {
 }
 
 fn send_wol_packet() {
-    // 	e0:d5:5e:26:81:1b
     let mac_addr: [u8; 6] = [0xe0, 0xd5, 0x5e, 0x26, 0x8a, 0x1b];
     let packet = wake_on_lan::MagicPacket::new(&mac_addr);
-    packet.send_to("10.4.1.51", "0.0.0.0");
+    packet.send_to("10.4.1.51", "127.0.1.1");
+    println!("Sent WOL packet");
 }
