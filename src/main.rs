@@ -3,6 +3,7 @@ use lg_webos_client::client::*;
 use std::sync::RwLock;
 use lazy_static::lazy_static;
 use structopt::StructOpt;
+use std::process::exit;
 
 lazy_static! {
     static ref CONFIG: RwLock<WebOsClientConfig> = RwLock::new(WebOsClientConfig::default());
@@ -26,6 +27,7 @@ enum GetArgs {
     Vol,
     InputList,
     Mute,
+    Mac,
 }
 
 #[derive(StructOpt, Debug)]
@@ -52,12 +54,23 @@ async fn main() {
     env_logger::init();
 
     let config: WebOsClientConfig = confy::load_path("/opt/lgtv/lgtv.conf").unwrap();
-    let client = WebosClient::new(config).await.unwrap();
     let opt = Opt::from_args();
     let mut res = "".to_string();
     if let Some(subcommand) = opt.commands {
         match subcommand {
             Cli::Get(getargs) => {
+                if !check_is_online() {
+                    println!("TV is offline.");
+                    exit(1);
+                }
+                let client = match WebosClient::new(config).await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        let formatted = format!("An error occurred: {}", e);
+                        println!("{}", formatted);
+                        exit(-1);
+                    }
+                };
                 match getargs {
                     GetArgs::Vol => {
                         res = send_command(client, Command::GetVolume).await;
@@ -68,21 +81,29 @@ async fn main() {
                     GetArgs::Mute => {
                         res = send_command(client, Command::IsMuted).await;
                     }
+                    GetArgs::Mac => {
+                        res = send_command(client, Command::GetNetState).await;
+                    }
                 }
             }
             Cli::Set(setargs) => {
                 match setargs {
                     SetArgs::Vol(vol) => {
+                        let client = WebosClient::new(config).await.unwrap();
+
                         res = send_command(client, Command::SetVolume(vol.vol)).await;
                     }
                     SetArgs::Mute(state) => {
+                        let client = WebosClient::new(config).await.unwrap();
+
                         res = send_command(client, Command::SetMute(state.state)).await;
                     }
                     SetArgs::Power(state) => {
-                        if !state.state {
-                            res = send_command(client, Command::TurnOff).await;
-                        } else {
+                        if state.state {
                             send_wol_packet();
+                        } else {
+                            let client = WebosClient::new(config).await.unwrap();
+                            res = send_command(client, Command::TurnOff).await;
                         }
                     }
                 }
@@ -98,9 +119,22 @@ async fn send_command(mut client: WebosClient, command: Command) -> String {
     pl
 }
 
+fn check_is_online() -> bool {
+    let mut cmd = std::process::Command::new("ping");
+    cmd
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    cmd
+        .args(&["-W", "1", "-c", "1"]);
+    cmd
+        .status()
+        .unwrap()
+        .success()
+}
+
 fn send_wol_packet() {
     let mac_addr: [u8; 6] = [0xe0, 0xd5, 0x5e, 0x26, 0x8a, 0x1b];
     let packet = wake_on_lan::MagicPacket::new(&mac_addr);
-    packet.send_to("10.4.1.51", "127.0.1.1");
+    packet.send_to("10.4.1.51", "0.0.0.0").unwrap();
     println!("Sent WOL packet");
 }
