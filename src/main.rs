@@ -123,18 +123,16 @@ fn check_is_online() -> bool {
     let mut cmd = std::process::Command::new("ping");
     cmd
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
-    cmd
-        .args(&["-W", "1", "-c", "1"]);
-    cmd
+        .stderr(std::process::Stdio::null())
+        .args(&["10.4.1.51", "-W", "1", "-c", "1"])
         .status()
         .unwrap()
         .success()
 }
 
 fn send_wol_packet() {
-    let mac_addr: [u8; 6] = [0xe0, 0xd5, 0x5e, 0x26, 0x8a, 0x1b];
+    let mac_addr: [u8; 6] = [0xec, 0xf4, 0x51, 0x5a, 0xe4, 0xf6];
     let packet = wake_on_lan::MagicPacket::new(&mac_addr);
-    packet.send_to("10.4.1.51", "0.0.0.0").unwrap();
+    packet.send_to("10.4.1.51:9", "0.0.0.0:0").unwrap();
     println!("Sent WOL packet");
 }
